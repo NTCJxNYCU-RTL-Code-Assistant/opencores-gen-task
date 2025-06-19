@@ -2,8 +2,7 @@ import openai
 import json
 from typing import Optional
 from openai.types.chat import ChatCompletion
-
-# 輸入 PDF 檔案路徑與文字內容，回傳 GPT-4o 的 JSON 結果
+import os
 
 
 def extract_text_from_pdf(pdf_path: str) -> str:
@@ -11,11 +10,9 @@ def extract_text_from_pdf(pdf_path: str) -> str:
     return ""
 
 
-def call_gpt_4o_api(prompt: str,
-                    api_key: str,
-                    model: str = "gpt-4o") -> Optional[ChatCompletion]:
+def call_gpt_4o_api(prompt: str) -> Optional[ChatCompletion]:
+    assert model is not None, "OPENAI_MODEL 未設定"
     try:
-        openai.api_key = api_key
         response = openai.chat.completions.create(model=model,
                                                   messages=[{
                                                       "role": "user",
@@ -27,14 +24,10 @@ def call_gpt_4o_api(prompt: str,
         return None
 
 
-def main(pdf_path: str, text: str, api_key: str):
-    # 1. 讀取 PDF 內容
+def main(pdf_path: str, text: str):
     pdf_text = extract_text_from_pdf(pdf_path)
-    # 2. 合併 PDF 文字與額外文字
     full_prompt = pdf_text + "\n" + text
-    # 3. 呼叫 GPT-4o API
-    result = call_gpt_4o_api(full_prompt, api_key)
-    # 4. 輸出 JSON 結果
+    result = call_gpt_4o_api(full_prompt)
     if result is not None:
         print(result.model_dump_json(indent=4))
     else:
@@ -42,8 +35,8 @@ def main(pdf_path: str, text: str, api_key: str):
 
 
 if __name__ == "__main__":
-    # 範例用法，請自行填入 pdf_path、text、api_key
+    openai.api_key = os.getenv("OPENAI_API_KEY")
+    model = os.getenv("OPENAI_MODEL")
     pdf_path = "your_file.pdf"
     text = "這裡輸入額外的文字內容"
-    api_key = "sk-..."
-    main(pdf_path, text, api_key)
+    main(pdf_path, text)
