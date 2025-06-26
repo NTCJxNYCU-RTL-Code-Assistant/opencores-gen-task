@@ -120,8 +120,11 @@ def main(pdf_path: str, prompt: str):
     result = call_api(full_prompt)
     if result is not None:
         print("API 回應成功：")
-        response_content = result.model_dump_json(indent=4)
-        print(response_content)
+        
+        # 提取實際的 JSON 內容
+        json_content = result.choices[0].message.content
+        print("提取的 JSON 內容：")
+        print(json_content)
         
         # 創建 generated 目錄
         os.makedirs("generated", exist_ok=True)
@@ -132,14 +135,14 @@ def main(pdf_path: str, prompt: str):
             pdf_filename = pdf_filename[:-4]  # 移除 .pdf 後綴
         
         # 生成輸出檔案路徑
-        output_filename = f"{pdf_filename}.log"
+        output_filename = f"{pdf_filename}.json"  # 改為 .json 副檔名
         output_path = os.path.join("generated", output_filename)
         
         # 寫入檔案
         try:
             with open(output_path, 'w', encoding='utf-8') as f:
-                f.write(response_content)
-            print(f"回應已儲存至：{output_path}")
+                f.write(json_content)
+            print(f"JSON 內容已儲存至：{output_path}")
         except Exception as e:
             print(f"儲存檔案時發生錯誤：{e}")
     else:
