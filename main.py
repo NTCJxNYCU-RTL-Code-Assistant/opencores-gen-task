@@ -196,15 +196,17 @@ if __name__ == "__main__":
 
     # prompt
     prompt = """
-You are an experienced Verilog engineer. You will be provided with both a specification PDF and the final Verilog source code. Based on the content of BOTH the specification and the source code, please analyze and break down the requirements into a comprehensive task hierarchy, reflecting the actual implementation and structure found in the code.
+You are an experienced Verilog engineer. You will be provided with both a specification PDF and the final Verilog source code. Your task is to analyze and break down the requirements into a comprehensive, hierarchical task structure that accurately reflects both the specification and the actual code implementation. The goal is to produce a detailed, implementation-level task breakdown that can guide project management, code review, and verification planning.
 
-Your analysis should:
-1. Identify all major functional modules and components (as described in the spec and as implemented in the code)
-2. Break down each module into detailed sub-tasks at the implementation level
-3. Establish clear hierarchical relationships between modules and sub-modules
-4. Define module-level task descriptions with technical specifications
-5. Consider dependencies and interfaces between different modules
-6. Ensure the task breakdown matches the actual code structure and implementation
+Requirements:
+- Analyze both the specification PDF and the Verilog source code.
+- Identify all major functional modules and components (as described in the spec and as implemented in the code).
+- For each module, break down into detailed sub-tasks at the implementation level.
+- Support up to three levels of sub-modules (i.e., modules may contain sub-modules, which may themselves contain sub-modules, up to three levels deep).
+- Establish clear hierarchical relationships between modules and sub-modules.
+- Define module-level task descriptions with technical specifications.
+- Consider dependencies and interfaces between different modules.
+- Ensure the task breakdown matches the actual code structure and implementation.
 
 Please return your analysis in the following JSON format:
 
@@ -214,7 +216,7 @@ Please return your analysis in the following JSON format:
     "description": "Brief description of the overall project",
     "complexity_level": "Low/Medium/High"
   },
-  "main_modules": [
+  "modules": [
     {
       "module_name": "Module name",
       "module_type": "e.g., Control Logic, Data Path, Interface, Memory Controller",
@@ -226,7 +228,7 @@ Please return your analysis in the following JSON format:
         "outputs": ["list of output signals/ports"],
         "parameters": ["list of parameters if any"]
       },
-      "sub_tasks": [
+      "tasks": [
         {
           "task_id": "unique identifier",
           "task_name": "Specific implementation task",
@@ -238,15 +240,28 @@ Please return your analysis in the following JSON format:
       ],
       "sub_modules": [
         {
-          "sub_module_name": "Sub-module name",
+          "module_name": "Sub-module name (level 2)",
           "description": "Sub-module functionality",
           "tasks": [
             {
               "task_id": "unique identifier",
               "task_name": "Implementation task",
               "description": "Task details",
-              "dependencies": ["dependencies"],
-              "estimated_effort": "hours or days"
+              "dependencies": ["dependencies"]
+            }
+          ],
+          "sub_modules": [
+            {
+              "module_name": "Sub-module name (level 3)",
+              "description": "Sub-sub-module functionality",
+              "tasks": [
+                {
+                  "task_id": "unique identifier",
+                  "task_name": "Implementation task",
+                  "description": "Task details",
+                  "dependencies": ["dependencies"]
+                }
+              ]
             }
           ]
         }
@@ -257,27 +272,26 @@ Please return your analysis in the following JSON format:
     {
       "task_id": "integration task identifier",
       "task_name": "Integration task name",
-      "description": "Integration requirements",
-      "involved_modules": ["list of modules to integrate"],
-      "verification_plan": "How to verify the integration"
+      "description": "Integration requirements (e.g., how to connect and verify multiple modules together, including sub-modules if necessary)",
+      "involved_modules": ["list of modules and/or sub-modules to integrate (specify full path if nested)"],
+      "verification_plan": "How to verify the integration (e.g., top-level simulation, interface checks, etc.)"
     }
   ],
   "verification_strategy": {
-    "testbench_requirements": ["list of testbenches needed"],
-    "simulation_scenarios": ["list of test scenarios"],
-    "coverage_requirements": ["coverage metrics to achieve"]
+    "testbench_requirements": ["list of testbenches needed (specify for modules and sub-modules as appropriate)"],
+    "simulation_scenarios": ["list of test scenarios, including corner cases and integration flows"],
+    "coverage_requirements": ["coverage metrics to achieve, e.g., code, functional, interface coverage"]
   }
 }
 
-Please ensure that:
-- All task_ids are unique across the entire project
-- Dependencies are clearly specified using task_ids
-- Module interfaces are well-defined
-- The hierarchy reflects logical implementation order
-- Technical complexity is realistically assessed
-- The analysis and task breakdown should be consistent with the actual Verilog code provided
-
-Respond ONLY with the JSON structure, no additional text.
+Notes:
+- All task_ids must be unique across the entire project, including all module and sub-module levels.
+- Dependencies should be clearly specified using task_ids.
+- Module interfaces must be well-defined.
+- The hierarchy should reflect logical and implementation order, supporting up to three levels of sub-modules.
+- Technical complexity should be realistically assessed.
+- The analysis and task breakdown must be consistent with the actual Verilog code provided.
+- Respond ONLY with the JSON structure, no additional text.
 """
 
     # 檢查 PDF 檔案是否存在
