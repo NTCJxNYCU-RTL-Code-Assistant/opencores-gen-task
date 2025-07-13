@@ -2,3 +2,8 @@
 pdf/
 generated/
 *.log
+downloads/
+*.tar.gz
+*.zip
+*.7z
+*.rar
