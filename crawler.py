@@ -99,7 +99,11 @@ class OpenCoresCrawler:
         # 儲存已處理的項目
         self.processed_projects = set()
         for f in os.listdir(download_dir):
-            self.processed_projects.add(f)
+            # 如果 f 是資料夾且裡面有檔案，才視為已處理過
+            full_path = os.path.join(download_dir, f)
+            if os.path.isdir(full_path):
+                if os.listdir(full_path):  # 資料夾內有檔案
+                    self.processed_projects.add(f)
         logger.info(f"已處理項目: {len(self.processed_projects)}")
         self.failed_downloads = []
 
