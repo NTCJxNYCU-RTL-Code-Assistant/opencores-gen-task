@@ -1,5 +1,4 @@
 openai
-PyPDF2
 weave
 requests
 beautifulsoup4
@@ -7,3 +6,5 @@ lxml
 pathlib
 selenium
 webdriver-manager
+pymupdf
+shapely

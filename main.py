@@ -183,15 +183,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # 設定 OpenAI API
-    openai.api_key = os.getenv("OPENAI_API_KEY")
-    model = os.getenv("OPENAI_MODEL")
+    openai.api_key = os.getenv("OPENROUTER_API_KEY")
+    model = os.getenv("OPENROUTER_MODEL")
 
     if not openai.api_key:
-        print("錯誤：請設定 OPENAI_API_KEY 環境變數")
+        print("錯誤：請設定 OPENROUTER_API_KEY 環境變數")
         exit(1)
 
     if not model:
-        print("錯誤：請設定 OPENAI_MODEL 環境變數")
+        print("錯誤：請設定 OPENROUTER_MODEL 環境變數")
         exit(1)
 
     # prompt
