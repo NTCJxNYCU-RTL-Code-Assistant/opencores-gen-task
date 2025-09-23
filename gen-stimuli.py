@@ -5,7 +5,7 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-weave.init('opencores-gen-stimuli')
+weave.init("opencores-gen-stimuli")
 
 EXTRACT_PROMPT = """
 You are a professional digital circuit verification engineer.
@@ -55,6 +55,62 @@ Your output should be in JSON format:
 1. Only output the stimuli signal in the `initial` block.
 2. Only output the signal name and the values.
 3. Do NOT add explanations, comments, or extra text outside the json, including the ``` ``` block.
+"""
+
+EXTRACT_TASK_PROMPT = """
+You are a professional digital circuit verification engineer.
+
+[Task]
+Extract stimuli signal from given testbench, and generate a SystemVerilog task named "drive_stimuli" for testbench usage.
+
+[Instructions]
+1. The stimuli signal will show in `initial` block.
+2. Omit the clock signal (`clk`) and reset signal (`rst`).
+
+[Example]
+Here is a testbench for sequential circuit.
+```verilog
+module testbench;
+    reg clk;
+    reg rst;
+    reg [7:0] data_in_1;
+    reg [7:0] data_in_2;
+    reg [7:0] data_out;
+    wire valid;
+
+    initial begin
+        clk = 0;
+        rst = 1;
+        data_in_1 = 8'h0;
+        data_in_2 = 8'h1;
+        data_out = 8'h0;
+        valid = 0;
+
+        #10;
+
+        clk = 1; #1;
+        data_in_1 = 8'h1;
+        data_in_2 = 8'h2;
+        #4; clk = 0; #5;
+    end
+endmodule
+```
+Your output should be in SystemVerilog code of the "drive_stimuli" task.
+```verilog
+task drive_stimuli();
+    @(posedge clk);
+    data_in_1 = 8'h0;
+    data_in_2 = 8'h1;
+    
+    @(posedge clk);
+    data_in_1 = 8'h1;
+    data_in_2 = 8'h2;
+endtask
+```
+
+[Rules]
+1. Only output the stimuli signal in the `initial` block.
+2. Do NOT add explanations, comments, or extra text outside the verilog code, including the ``` ``` block.
 """
 
 WRITE_TB_PROMPT = """
@@ -187,43 +243,75 @@ def extract_stimuli(tb_filepath: str) -> str:
         tb_code = f.read()
     response = openai.chat.completions.create(
         model=model,
-        messages=[{
-            "role": "user",
-            "content": EXTRACT_PROMPT + "\n\n[Testbench]\n" + tb_code
-        }],
-        response_format={"type": "json_object"})
+        messages=[
+            {"role": "user", "content": EXTRACT_PROMPT + "\n\n[Testbench]\n" + tb_code}
+        ],
+        response_format={"type": "json_object"},
+    )
     return response.choices[0].message.content
+
+
+@weave.op()
+def extract_task(tb_filepath: str) -> str:
+    with open(tb_filepath, "r") as f:
+        tb_code = f.read()
+    response = openai.chat.completions.create(
+        model=model,
+        messages=[
+            {
+                "role": "user",
+                "content": EXTRACT_TASK_PROMPT + "\n\n[Testbench]\n" + tb_code,
+            }
+        ],
+    )
+    return response.choices[0].message.content
+
+
+def extract_spec(spec_filepath: str) -> str:
+    with open(spec_filepath, "r", encoding="utf-8") as f:
+        spec = f.read()
+
+    # 從 spec 中提取 Introduction 和 Interface 部分
+    lines = spec.split("\n")
+    filtered_lines = []
+    include_section = False
+
+    for line in lines:
+        if line.startswith("# Introduction") or line.startswith("# Interface"):
+            include_section = True
+            filtered_lines.append(line)
+        elif line.startswith("# ") and not (
+            line.startswith("# Introduction") or line.startswith("# Interface")
+        ):
+            include_section = False
+        elif include_section:
+            filtered_lines.append(line)
+
+    spec = "\n".join(filtered_lines)
+    return spec
+
 
 @weave.op()
 def write_testbench(stimuli_filepath: str, spec_filepath: str) -> str:
     with open(stimuli_filepath, "r") as f:
         stimuli_json = f.read()
-    with open(spec_filepath, "r", encoding="utf-8") as f:
-        spec = f.read()
+    spec = extract_spec(spec_filepath)
 
-    # 從 spec 中提取 Introduction 和 Interface 部分
-    lines = spec.split('\n')
-    filtered_lines = []
-    include_section = False
-    
-    for line in lines:
-        if line.startswith('# Introduction') or line.startswith('# Interface'):
-            include_section = True
-            filtered_lines.append(line)
-        elif line.startswith('# ') and not (line.startswith('# Introduction') or line.startswith('# Interface')):
-            include_section = False
-        elif include_section:
-            filtered_lines.append(line)
-    
-    spec = '\n'.join(filtered_lines)
-    
     response = openai.chat.completions.create(
         model=model,
-        messages=[{
-            "role": "user",
-            "content": WRITE_TB_PROMPT + "\n\n[Specification]\n" + spec + "\n\n[Stimuli]\n" + stimuli_json
-        }])
+        messages=[
+            {
+                "role": "user",
+                "content": WRITE_TB_PROMPT
+                + "\n\n[Specification]\n"
+                + spec
+                + "\n\n[Stimuli]\n"
+                + stimuli_json,
+            }
+        ],
+    )
     return response.choices[0].message.content
+
 
 if __name__ == "__main__":
     openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -240,31 +328,31 @@ if __name__ == "__main__":
     print(f"Using model: {model}")
 
     tb_project = "bubble_sort"
-    # tb_filepaths = [
-    #     "opencores/bubble_sort_module/sim/rtl_sim/src/testbench.v",
-    # ]
+    tb_filepaths = [
+        "opencores/bubble_sort_module/sim/rtl_sim/src/testbench.v",
+    ]
 
-    # stimuli_map = {}
+    task_map = {}
 
-    # for tb_filepath in tb_filepaths:
-    #     if not os.path.exists(tb_filepath):
-    #         print(f"錯誤：{tb_filepath} 不存在")
-    #         continue
-    #     print(f"Processing {tb_filepath}...")
-    #     try:
-    #         stimuli_map[tb_filepath] = extract_stimuli(tb_filepath)
-    #     except Exception as e:
-    #         print(f"錯誤：{e}")
-    #         continue
+    for tb_filepath in tb_filepaths:
+        if not os.path.exists(tb_filepath):
+            print(f"錯誤：{tb_filepath} 不存在")
+            continue
+        print(f"Processing {tb_filepath}...")
+        try:
+            task_map[tb_filepath] = extract_task(tb_filepath)
+        except Exception as e:
+            print(f"錯誤：{e}")
+            continue
 
-    # # 寫入 json 檔案
-    # os.makedirs("generated", exist_ok=True)
+    # 寫入 json 檔案
+    os.makedirs(f"generated/{tb_project}", exist_ok=True)
 
-    stimuli_filepath = f"generated/{tb_project}/stimuli.json"
-    # with open(stimuli_filepath, "w") as f:
-    #     f.write(stimuli_map)
+    for i, (tb_filepath, task_code) in enumerate(task_map.items()):
+        with open(f"generated/{tb_project}/task_{i}.sv", "w") as f:
+            f.write(f"// {tb_filepath}\n{task_code}")
 
-    spec_filepath = f"generated/{tb_project}/spec.md"
-    tb_code = write_testbench(stimuli_filepath, spec_filepath)
-    with open(f"generated/{tb_project}/tb.sv", "w") as f:
-        f.write(tb_code)
+    # spec_filepath = f"generated/{tb_project}/spec.md"
+    # tb_code = write_testbench(stimuli_filepath, spec_filepath)
+    # with open(f"generated/{tb_project}/tb.sv", "w") as f:
+    #     f.write(tb_code)
