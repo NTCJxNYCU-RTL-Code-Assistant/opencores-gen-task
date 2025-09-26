@@ -412,6 +412,23 @@ def filter_control_structures(code: str) -> str:
     return current_code
 
 
+def regularize_code(code: str) -> list[str]:
+    """將程式碼中的語句進行標準化處理"""
+    words = code.split()
+    lines: list[str] = []
+    line = ""
+    end_delimiters = ["begin", "end", "endmodule", "endtask", "endfunction"]
+
+    for word in words:
+        line += " " + word
+        if word in end_delimiters or word.endswith(";"):
+            lines.append(line.strip())
+            line = ""
+
+    lines = [line for line in lines if line != ";"]
+    return lines
+
+
 def filter_non_assignments(code: str) -> str:
     """過濾掉非賦值語句，不包含函數呼叫、if、while、for"""
 
@@ -422,16 +439,14 @@ def filter_non_assignments(code: str) -> str:
             return False
 
         # 保留賦值語句
-        if re.search(r"\w+\s*[=<]=\s*", statement):  # = 或 <=
+        if re.search(r"\w+\s*(=|<=)\s*", statement):  # = 或 <=
             return True
 
-        # 保留函數呼叫（包含括號的語句，但排除控制結構）
-        if re.search(r"\w+\s*\(", statement) and not re.search(
-            r"^\s*(if|else|while|for|repeat|case)\s*\(", statement
-        ):
+        # 保留函數呼叫
+        if re.search(r"\w+\s*\(", statement):
             return True
 
-        # 保留控制語句關鍵字
+        # 保留關鍵字語句
         if re.search(
             r"^\s*(if|else|while|for|repeat|case|default|begin|end|endmodule|endtask|endfunction)\b",
             statement,
@@ -440,37 +455,7 @@ def filter_non_assignments(code: str) -> str:
 
         return False
 
-    # 按語句分割程式碼，將分隔符附加到語句尾端
-    # 使用正則表達式分割，但保持分隔符在語句尾端
-    delimiter_pattern = (
-        r"(;|\bbegin\b|\bend\b|\bendmodule\b|\bendtask\b|\bendfunction\b)"
-    )
-    parts = re.split(delimiter_pattern, code)
-
-    statements = []
-    i = 0
-    while i < len(parts):
-        statement_part = parts[i].strip()
-
-        # 檢查下一個元素是否為分隔符
-        if i + 1 < len(parts) and re.match(delimiter_pattern, parts[i + 1]):
-            delimiter = parts[i + 1]
-            if statement_part:  # 只有當語句部分不為空時才組合
-                full_statement = statement_part + (
-                    delimiter if delimiter == ";" else " " + delimiter
-                )
-                # 對語句進行標準化處理
-                normalized_statement = re.sub(r"\s+", " ", full_statement).strip()
-                if normalized_statement:
-                    statements.append(normalized_statement)
-            i += 2  # 跳過分隔符
-        else:
-            # 沒有分隔符的部分
-            if statement_part:
-                normalized_statement = re.sub(r"\s+", " ", statement_part).strip()
-                if normalized_statement:
-                    statements.append(normalized_statement)
-            i += 1
+    statements = regularize_code(code)
 
     with open("temp/statements.txt", "w") as f:
         f.write("\n".join(statements))
