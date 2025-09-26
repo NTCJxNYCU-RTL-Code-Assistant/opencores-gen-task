@@ -7,248 +7,17 @@ from dotenv import load_dotenv
 load_dotenv()
 weave.init("opencores-gen-stimuli")
 
-EXTRACT_PROMPT = """
+EXTRACT_BLOCK_PROMPT = """
 You are a professional digital circuit verification engineer.
 
 [Task]
-Extract stimuli signal from given testbench.
-
-[Instructions]
-1. The stimuli signal will show in `initial` block.
-2. Omit the clock signal (`clk`) and reset signal (`rst`).
-
-[Example]
-Here is a testbench for sequential circuit.
-```verilog
-module testbench;
-    reg clk;
-    reg rst;
-    reg [7:0] data_in_1;
-    reg [7:0] data_in_2;
-    reg [7:0] data_out;
-    wire valid;
-
-    initial begin
-        clk = 0;
-        rst = 1;
-        data_in_1 = 8'h0;
-        data_in_2 = 8'h1;
-        data_out = 8'h0;
-        valid = 0;
-
-        #10;
-
-        clk = 1; #1;
-        data_in_1 = 8'h1;
-        data_in_2 = 8'h2;
-        #4; clk = 0; #5;
-    end
-endmodule
-```
-Your output should be in JSON format:
-{
-    "data_in_1": ["8'h0", "8'h1"],
-    "data_in_2": ["8'h1", "8'h2"]
-}
+You will be given a testbench written in Verilog or SystemVerilog.
+Extract whole `initial` blocks, `task`s, and `function`s.
 
 [Rules]
-1. Only output the stimuli signal in the `initial` block.
-2. Only output the signal name and the values.
-3. Do NOT add explanations, comments, or extra text outside the json, including the ``` ``` block.
+1. Preserve the `module`, `initial`, `task`, and `function` declarations.
+2. Only output the Verilog code or SystemVerilog code, DO NOT output anything else, including the ``` ``` block.
 """
-
-EXTRACT_TASK_PROMPT = """
-You are a professional digital circuit verification engineer.
-
-[Task]
-Extract stimuli signal from given testbench, and generate a SystemVerilog task named "drive_stimuli" for testbench usage.
-
-[Instructions]
-1. The stimuli signal will show in `initial` block.
-2. Omit the clock signal (`clk`) and reset signal (`rst`).
-
-[Example]
-Here is a testbench for sequential circuit.
-```verilog
-module testbench;
-    reg clk;
-    reg rst;
-    reg [7:0] data_in_1;
-    reg [7:0] data_in_2;
-    reg [7:0] data_out;
-    wire valid;
-
-    initial begin
-        clk = 0;
-        rst = 1;
-        data_in_1 = 8'h0;
-        data_in_2 = 8'h1;
-        data_out = 8'h0;
-        valid = 0;
-
-        #10;
-
-        clk = 1; #1;
-        data_in_1 = 8'h1;
-        data_in_2 = 8'h2;
-        #4; clk = 0; #5;
-    end
-endmodule
-```
-Your output should be in SystemVerilog code of the "drive_stimuli" task.
-```verilog
-task drive_stimuli();
-    @(posedge clk);
-    data_in_1 = 8'h0;
-    data_in_2 = 8'h1;
-    
-    @(posedge clk);
-    data_in_1 = 8'h1;
-    data_in_2 = 8'h2;
-endtask
-```
-
-[Rules]
-1. Only output the stimuli signal in the `initial` block.
-2. Do NOT add explanations, comments, or extra text outside the verilog code, including the ``` ``` block.
-"""
-
-WRITE_TB_PROMPT = """
-You are a professional digital circuit verification engineer with expertise in SystemVerilog testbench development.
-
-[Task]  
-Generate a SystemVerilog task named "tb" for testbench usage.
-
-[Instructions]  
-Let's think step by step.  
-1. Based on the given circuit specification, extract the output behavior protocol.  
-2. According to the circuit type (sequential or combinational) and output protocol, write a SystemVerilog task "monitor_dut" that monitors DUT outputs.  
-3. The task does NOT declare input/output ports explicitly, since all signals can be accessed directly in the TB scope.  
-   - Input signals: <input_signal_name>  
-   - Output signals for DUT: <output_signal_name>_dut  
-   - Output signals for Reference: <output_signal_name>_ref  
-4. Behavior inside the task:  
-   - If the circuit is SEQUENTIAL: use a `forever` loop to keep monitoring. When the current cycle matches the output protocol, sample data in the NEXT cycle.  
-   - If the circuit is COMBINATIONAL: sample data after `#0` delay.  
-   - Only push data-related outputs into `<output_signal_name>_q`; control signals should NOT be pushed.
-5. I will give you the stimuli signal in JSON format, you need to drive the DUT based on the stimuli signal.
-
-[Example]
-Here is a specificaton of a sequential circuit.
-
-```
-## Introduction
-This is a sequential circuit, output the sum of two input signals.
-
-## Interface
-| Signal       | Direction | Comments                                                                                            |
-|--------------|-----------|-----------------------------------------------------------------------------------------------------|
-| clk          | input     | No comments                                                                                         |
-| rst          | input     | Active high                                                                                         |
-| data_in_1    | input     | input signal                                                                                        |
-| data_in_2    | input     | input signal                                                                                        |
-| data_out     | output    | output signal                                                                                       |
-```
-
-And here is the stimuli signal.
-```json
-{
-    "data_in_1": ["8'h0", "8'h1"],
-    "data_in_2": ["8'h1", "8'h2"]
-}
-```
-
-Your output should be in SystemVerilog code of the "tb" module.
-```systemverilog
-module tb;
-    // Inputs
-    reg clk;
-    reg rst;
-    reg [7:0] data_in_1;
-    reg [7:0] data_in_2;
-    
-    // Outputs for DUT
-    wire [7:0] data_out_dut;
-
-    // Outputs for Reference
-    wire [7:0] data_out_ref;
-
-    // Check mismatch
-    wire mismatch;
-    assign mismatch = data_out_dut !== data_out_ref;
-
-    // Instantiate the Unit Under Test
-    TopModule #(8,7)
-    dut (
-        .clk(clk),
-        .rst(rst),
-        .data_in_1(data_in_1),
-        .data_in_2(data_in_2),
-        .data_out_dut(data_out_dut)
-    );
-
-    // Instantiate the Reference Module
-    TopModule #(8,7)
-    ref (
-        .clk(clk),
-        .rst(rst),
-        .data_in_1(data_in_1),
-        .data_in_2(data_in_2),
-        .data_out_ref(data_out_ref)
-    );
-
-    initial begin
-        // Initialize Inputs
-        clk = 0;
-        rst = 1;
-        data_in_1 = 0;
-        data_in_2 = 0;
-
-        #10;
-        rst = 0;
-
-        // Stimuli 1st cycle
-        @(posedge clk);
-        data_in_1 <= 8'h0;
-        data_in_2 <= 8'h1;
-        if (mismatch) begin
-            $display("Mismatch at %0d", $time);
-            $finish;
-        end
-
-        // Stimuli 2nd cycle
-        @(posedge clk);
-        data_in_1 <= 8'h1;
-        data_in_2 <= 8'h2;
-        if (mismatch) begin
-            $display("Mismatch at %0d", $time);
-            $finish;
-        end
-
-        $finish;
-    end
-endmodule
-```
-
-[Rules]  
-1. Must follow correct SystemVerilog syntax.  
-2. ONLY output the SystemVerilog code of the "tb" module.
-3. Do NOT add explanations, comments, or extra text outside the verilog code, including the ``` ``` block.
-"""
-
-
-@weave.op()
-def extract_stimuli(tb_filepath: str) -> str:
-    with open(tb_filepath, "r") as f:
-        tb_code = f.read()
-    response = openai.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "user", "content": EXTRACT_PROMPT + "\n\n[Testbench]\n" + tb_code}
-        ],
-        response_format={"type": "json_object"},
-    )
-    return response.choices[0].message.content
 
 
 @weave.op()
@@ -260,7 +29,7 @@ def extract_task(tb_filepath: str) -> str:
         messages=[
             {
                 "role": "user",
-                "content": EXTRACT_TASK_PROMPT + "\n\n[Testbench]\n" + tb_code,
+                "content": EXTRACT_BLOCK_PROMPT + "\n\n[Testbench]\n" + tb_code,
             }
         ],
     )
@@ -291,26 +60,189 @@ def extract_spec(spec_filepath: str) -> str:
     return spec
 
 
-@weave.op()
-def write_testbench(stimuli_filepath: str, spec_filepath: str) -> str:
-    with open(stimuli_filepath, "r") as f:
-        stimuli_json = f.read()
-    spec = extract_spec(spec_filepath)
+def remove_comments(code: str) -> str:
+    """移除 Verilog/SystemVerilog 的單行和多行註解"""
+    # 移除多行註解 /* ... */
+    code = re.sub(r"/\*.*?\*/", "", code, flags=re.DOTALL)
+    # 移除單行註解 //
+    code = re.sub(r"//.*?$", "", code, flags=re.MULTILINE)
+    return code
 
-    response = openai.chat.completions.create(
-        model=model,
-        messages=[
-            {
-                "role": "user",
-                "content": WRITE_TB_PROMPT
-                + "\n\n[Specification]\n"
-                + spec
-                + "\n\n[Stimuli]\n"
-                + stimuli_json,
-            }
-        ],
-    )
-    return response.choices[0].message.content
+
+def process_defines(code: str) -> str:
+    """處理 `define 指令，將定義的巨集替換到程式碼中"""
+    defines = {}
+
+    # 找到所有 `define 定義
+    define_pattern = r"`define\s+(\w+)\s+(.+?)(?=\n|$)"
+    define_matches = re.finditer(define_pattern, code, re.MULTILINE)
+
+    for match in define_matches:
+        macro_name = match.group(1)
+        macro_value = match.group(2).strip()
+        defines[macro_name] = macro_value
+
+    # 替換所有使用巨集的地方
+    for macro_name, macro_value in defines.items():
+        # 替換 `macro_name 為對應的值
+        macro_usage_pattern = r"`" + re.escape(macro_name) + r"\b"
+        code = re.sub(macro_usage_pattern, macro_value, code)
+
+    # 移除 `define 和 `undef 行
+    code = re.sub(r"`define\s+\w+\s+.+?(?=\n|$)", "", code, flags=re.MULTILINE)
+    code = re.sub(r"`undef\s+\w+\s*(?=\n|$)", "", code, flags=re.MULTILINE)
+
+    return code
+
+
+def extract_module_declaration(code: str) -> str:
+    """提取 module 宣告"""
+    # 匹配 module 宣告，包括參數和連接埠
+    pattern = r"(module\s+\w+[^;]*;)"
+    match = re.search(pattern, code, re.MULTILINE | re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return ""
+
+
+def extract_initial_blocks(code: str) -> list:
+    """提取所有 initial 區塊"""
+    blocks = []
+    # 先找到所有 initial 關鍵字的位置
+    pattern = r"initial\s+"
+    matches = re.finditer(pattern, code, re.MULTILINE)
+
+    for match in matches:
+        # 從每個 initial 位置開始匹配完整區塊
+        block = match_begin_end_block(code, match.start())
+        if block:
+            blocks.append(block)
+
+    return blocks
+
+
+def extract_task_blocks(code: str) -> list:
+    """提取所有 task 定義"""
+    blocks = []
+    pattern = r"(task\s+\w+[^;]*;.*?endtask)"
+    matches = re.finditer(pattern, code, re.MULTILINE | re.DOTALL)
+
+    for match in matches:
+        blocks.append(match.group(1).strip())
+
+    return blocks
+
+
+def extract_function_blocks(code: str) -> list:
+    """提取所有 function 定義"""
+    blocks = []
+    pattern = r"(function\s+[^;]*;.*?endfunction)"
+    matches = re.finditer(pattern, code, re.MULTILINE | re.DOTALL)
+
+    for match in matches:
+        blocks.append(match.group(1).strip())
+
+    return blocks
+
+
+def extract_module_instances(code: str) -> list:
+    """提取所有模組實例化宣告（如 UUT）"""
+    blocks = []
+    # 匹配模組實例化：module_name [#(parameters)] instance_name (port_connections);
+    pattern = r"(\w+\s+(?:#\([^)]*\)\s+)?\w+\s*\([^;]*\);)"
+    matches = re.finditer(pattern, code, re.MULTILINE | re.DOTALL)
+
+    for match in matches:
+        instance_text = match.group(1).strip()
+        # 檢查是否包含埠連接（避免誤判其他語句）
+        if "." in instance_text and ("(" in instance_text and ")" in instance_text):
+            blocks.append(instance_text)
+
+    return blocks
+
+
+def match_begin_end_block(code: str, start_pos: int) -> str:
+    """從指定位置開始匹配完整的 initial begin/end 區塊"""
+    # 找到 initial 關鍵字的位置
+    initial_match = re.search(r"initial\s+", code[start_pos:])
+    if not initial_match:
+        return ""
+
+    # 從 initial 後開始尋找
+    pos = start_pos + initial_match.end()
+
+    # 跳過空白字元
+    while pos < len(code) and code[pos].isspace():
+        pos += 1
+
+    # 檢查是否是 begin
+    if pos >= len(code) or code[pos : pos + 5] != "begin":
+        return ""
+
+    begin_count = 0
+    block_start = start_pos
+
+    i = pos
+    while i < len(code):
+        # 使用正則表達式來更精確地匹配關鍵字邊界
+        if re.match(r"\bbegin\b", code[i:]):
+            begin_count += 1
+            i += 5
+        elif re.match(r"\bend\b", code[i:]):
+            begin_count -= 1
+            if begin_count == 0:
+                # 找到匹配的 end，包含整個單字
+                end_pos = i + 3
+                return code[block_start:end_pos].strip()
+            i += 3
+        else:
+            i += 1
+
+    return ""
+
+
+def extract_block(tb_filepath: str) -> str:
+    """
+    使用基於規則的方式從 Verilog/SystemVerilog 測試檔案中提取 module、initial、task 和 function 區塊
+    """
+    with open(tb_filepath, "r") as f:
+        tb_code = f.read()
+
+    # 處理 `define 指令替換
+    tb_code = process_defines(tb_code)
+
+    # 移除註解
+    tb_code = remove_comments(tb_code)
+
+    # 找到所有需要提取的區塊
+    extracted_blocks = []
+
+    # 提取 module 宣告
+    module_match = extract_module_declaration(tb_code)
+    if module_match:
+        extracted_blocks.append(module_match)
+
+    # 提取模組實例化宣告
+    instance_blocks = extract_module_instances(tb_code)
+    extracted_blocks.extend(instance_blocks)
+
+    # 提取 initial 區塊
+    initial_blocks = extract_initial_blocks(tb_code)
+    extracted_blocks.extend(initial_blocks)
+
+    # 提取 task 定義
+    task_blocks = extract_task_blocks(tb_code)
+    extracted_blocks.extend(task_blocks)
+
+    # 提取 function 定義
+    function_blocks = extract_function_blocks(tb_code)
+    extracted_blocks.extend(function_blocks)
+
+    # 加上 endmodule
+    if module_match:
+        extracted_blocks.append("endmodule")
+
+    return "\n\n".join(extracted_blocks)
 
 
 if __name__ == "__main__":
@@ -327,10 +259,26 @@ if __name__ == "__main__":
 
     print(f"Using model: {model}")
 
-    tb_project = "bubble_sort"
+    # tb_project = "bubble_sort"
+    # tb_filepaths = [
+    #     "opencores/bubble_sort_module/sim/rtl_sim/src/testbench.v",
+    # ]
+
+    tb_project = "sha3"
     tb_filepaths = [
-        "opencores/bubble_sort_module/sim/rtl_sim/src/testbench.v",
+        "opencores/sha3/high_throughput_core/testbench/test_keccak.v",
+        "opencores/sha3/low_throughput_core/testbench/test_keccak.v",
     ]
+
+    # tb_project = "tate_bilinear_pairing"
+    # tb_filepaths = [
+    #     "opencores/tate_bilinear_pairing/testbench/test_tate_pairing.v",
+    # ]
+
+    # tb_project = "sdram_controller"
+    # tb_filepaths = [
+    #     "opencores/sdram_controller/verif/tb/tb_top.sv",
+    # ]
 
     task_map = {}
 
@@ -340,19 +288,13 @@ if __name__ == "__main__":
             continue
         print(f"Processing {tb_filepath}...")
         try:
-            task_map[tb_filepath] = extract_task(tb_filepath)
+            task_map[tb_filepath] = extract_block(tb_filepath)
         except Exception as e:
             print(f"錯誤：{e}")
             continue
 
-    # 寫入 json 檔案
-    os.makedirs(f"generated/{tb_project}", exist_ok=True)
+    os.makedirs(f"temp/{tb_project}", exist_ok=True)
 
     for i, (tb_filepath, task_code) in enumerate(task_map.items()):
-        with open(f"generated/{tb_project}/task_{i}.sv", "w") as f:
+        with open(f"temp/{tb_project}/temp_{i}.sv", "w") as f:
             f.write(f"// {tb_filepath}\n{task_code}")
-
-    # spec_filepath = f"generated/{tb_project}/spec.md"
-    # tb_code = write_testbench(stimuli_filepath, spec_filepath)
-    # with open(f"generated/{tb_project}/tb.sv", "w") as f:
-    #     f.write(tb_code)
