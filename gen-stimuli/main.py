@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 from typing import TypedDict
 
-# from preprocess import preprocess_code
+from preprocess import preprocess_code
 from generate import generate
 
 
@@ -26,7 +26,7 @@ if __name__ == "__main__":
 
     weave.init("opencores-gen-stimuli")
 
-    root = "generated"
+    root = "generated_stimuli_09272034"
 
     class Todo(TypedDict):
         project: str
@@ -77,12 +77,20 @@ if __name__ == "__main__":
                 print(f"Preprocessing {tb_filepath}...")
                 with open(tb_filepath, "r") as f:
                     code = f.read()
-                # code = preprocess_code(code)
-                # with open(f"{root}/{tb_project}/preprocess_{i}.sv", "w") as f:
-                #     f.write(f"// {tb_filepath}\n{code}")
+                code, task_blocks, function_blocks = preprocess_code(code)
+                with open(f"{root}/{tb_project}/preprocess_{i}.sv", "w") as f:
+                    f.write(f"// {tb_filepath}\n{code}")
 
-                # print(f"Generating {tb_filepath}...")
+                print(f"Generating {tb_filepath}...")
                 code = generate(model, code, spec_filepath)
+                code += "\n"
+                code += "\n".join(
+                    [block for block in task_blocks.values() if block is not None]
+                )
+                code += "\n"
+                code += "\n".join(
+                    [block for block in function_blocks.values() if block is not None]
+                )
                 with open(f"{root}/{tb_project}/task_{i}.sv", "w") as f:
                     f.write(f"// {tb_filepath}\n{code}")
             except Exception as e:

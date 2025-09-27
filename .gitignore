@@ -1,9 +1,9 @@
 .env
 __pycache__/
 pdf/
-generated/
-*.log
+generated*/
 downloads/
+*.log
 *.tar.gz
 *.zip
 *.7z

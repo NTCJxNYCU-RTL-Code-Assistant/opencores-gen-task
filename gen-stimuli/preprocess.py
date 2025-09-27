@@ -37,6 +37,7 @@ def process_defines(code: str) -> str:
         macro_usage_pattern = r"`" + re.escape(macro_name) + r"\b"
         code = re.sub(macro_usage_pattern, macro_value, code)
 
+    code = re.sub(define_pattern, "", code, flags=re.MULTILINE)
     return code
 
 
@@ -378,56 +379,57 @@ def extract_initial_blocks(code: str) -> list[str]:
     return blocks
 
 
-def preprocess_code(code: str) -> str:
+def preprocess_code(code: str):
     """預處理程式碼"""
     code = process_defines(code)
-    code = remove_comments(code)
+    # code = remove_comments(code)
     code = remove_system_call(code)
-    code = remove_declarations(code)
-    code = remove_if_blocks(code)
-    code = remove_case_blocks(code)
-    code = add_begin_end_block(code)
+    # code = remove_declarations(code)
+    # code = remove_if_blocks(code)
+    # code = remove_case_blocks(code)
+    # code = add_begin_end_block(code)
 
-    blocks = devide_by_quote(code)
-    lines = regularize_code(blocks)
+    # blocks = devide_by_quote(code)
+    # lines = regularize_code(blocks)
 
-    code = "\n".join(lines)
-    task_blocks, code = extract_task_blocks(code)
-    function_blocks, code = extract_function_blocks(code)
-    blocks = {**task_blocks, **function_blocks}
+    # code = "\n".join(lines)
+    task_blocks, rest_code = extract_task_blocks(code)
+    function_blocks, rest_code = extract_function_blocks(rest_code)
+    # blocks = {**task_blocks, **function_blocks}
 
-    while True:
-        removed_callable_names = [k for k, v in blocks.items() if v is None]
+    # while True:
+    #     removed_callable_names = [k for k, v in blocks.items() if v is None]
 
-        new_code = removing(code, removed_callable_names)
-        new_blocks: dict[str, str | None] = {}
+    #     new_code = removing(code, removed_callable_names)
+    #     new_blocks: dict[str, str | None] = {}
 
-        for k in blocks.keys():
-            if k in removed_callable_names:
-                new_blocks[k] = None
-                continue
-            new_blocks[k] = removing(blocks[k], removed_callable_names)
+    #     for k in blocks.keys():
+    #         if k in removed_callable_names:
+    #             new_blocks[k] = None
+    #             continue
+    #         new_blocks[k] = removing(blocks[k], removed_callable_names)
 
-        for k in blocks.keys():
-            if k in removed_callable_names:
-                continue
-            if is_empty_callable(new_blocks[k]):
-                new_blocks[k] = None
+    #     for k in blocks.keys():
+    #         if k in removed_callable_names:
+    #             continue
+    #         if is_empty_callable(new_blocks[k]):
+    #             new_blocks[k] = None
 
-        if new_code == code and new_blocks == blocks:
-            break
-        code = new_code
-        blocks = new_blocks
+    #     if new_code == code and new_blocks == blocks:
+    #         break
+    #     code = new_code
+    #     blocks = new_blocks
 
-    result = "module testbench;\n"
-    result += "\n".join(extract_module_instances(code)) + "\n"
-    result += "\n".join(extract_initial_blocks(code)) + "\n"
-    result += (
-        "\n".join([block for block in blocks.values() if block is not None]) + "\n"
-    )
-    result += "endmodule"
+    # result = "module testbench;\n"
+    # result += "\n".join(extract_module_instances(code)) + "\n"
+    # result += "\n".join(extract_initial_blocks(code)) + "\n"
+    # result += (
+    #     "\n".join([block for block in blocks.values() if block is not None]) + "\n"
+    # )
+    # result += "endmodule"
+    # code = result
 
-    return result
+    return code, task_blocks, function_blocks
 
 
 if __name__ == "__main__":

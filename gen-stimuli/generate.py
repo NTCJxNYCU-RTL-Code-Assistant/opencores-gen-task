@@ -33,7 +33,6 @@ module testbench;
 
         @ (negedge clk);
         input = 3; #5;
-        if (output !== 1) $display("E");
 
         #100;
 
@@ -56,7 +55,7 @@ module testbench;
     task check_out;
         input [2:0] out;
         begin
-            if (out !== output) $display("E");
+            $display("check_out: %b", out);
         end
     endtask
 
@@ -146,62 +145,13 @@ Let's think step by step.
         end
     endtask
     ```
-4. Finally, compare with the original testbench, if there are some logics or variables not defined in your tasks, you should find them in the original testbench, and append them to the top of your output.
-    ```systemverilog
-    task set_in;
-        input [2:0] in;
-        begin
-            input = in;
-        end
-    endtask
-
-    task drive_rst;
-        begin
-            clk = 0;
-            reset = 1;
-            input = 0;
-            #5;
-            reset = 0;
-        end
-    endtask
-
-    task drive_stimuli_1;
-        begin
-            @ (negedge clk);
-            input = 3;
-            #5;
-        end
-    endtask
-
-    task drive_stimuli_2;
-        begin
-            clk = 1; 
-            #5; 
-            clk = 0; 
-            #5;
-            input = 4;
-            #5;
-        end
-    endtask
-
-    task drive_stimuli_3;
-        begin
-            reset = 1;
-            #5;
-            reset = 0;
-            set_in(-2);
-            #5;
-        end
-    endtask
-    ```
-5. You have completed the task, only output the SystemVerilog code, DO NOT output anything else, including the ``` ``` block.
+4. You have completed the task, only output the SystemVerilog code, DO NOT output anything else, including the ``` ``` block.
 
 [Rules]
 1. Only output the Verilog code or SystemVerilog code, DO NOT output anything else, including the ``` ``` block.
-2. The tasks and defines from the original testbench should not change their name.
-3. The first task from you should be named with `drive_rst`, and the other tasks should be named with `drive_stimuli_i`, where `i` is the batch index after `drive_rst`, start from 1.
-3. All the tasks from you should not contain the output signals, or related logics.
-4. All the tasks from you should not contain the signals that are not defined in the module instance in the testbench.
+2. The first task should be named with `drive_rst`, and the other tasks should be named with `drive_stimuli_i`, where `i` is the batch index after `drive_rst`, start from 1.
+3. All the tasks should not contain the output signals, or related logics.
+4. All the tasks should not contain the signals that are not defined in the module instance of the testbench.
 """
 
 
