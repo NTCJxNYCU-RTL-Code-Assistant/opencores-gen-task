@@ -3,8 +3,6 @@ import weave
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
-
 WRITE_SEQUENTIAL_TASK_PROMPT = """
 You are a professional digital circuit verification engineer.
 
@@ -176,6 +174,7 @@ def generate(model: str, code: str, spec_filepath: str):
 
 
 if __name__ == "__main__":
+    load_dotenv()
     openai.api_key = os.getenv("OPENAI_API_KEY")
     model = os.getenv("OPENAI_MODEL")
 
